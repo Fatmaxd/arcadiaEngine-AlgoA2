@@ -368,11 +368,56 @@ long long WorldNavigator::minBribeCost(int n, int m, long long goldRate, long lo
 }
 
 string WorldNavigator::sumMinDistancesBinary(int n, vector<vector<int>>& roads) {
-    // TODO: Implement All-Pairs Shortest Path (Floyd-Warshall)
-    // Sum all shortest distances between unique pairs (i < j)
-    // Return the sum as a binary string
-    // Hint: Handle large numbers carefully
-    return "0";
+    if (n <= 0) return "0";
+
+    const long long INF = (long long)4e18;
+    vector<vector<long long>> dist(n, vector<long long>(n, INF));
+    for (int i = 0; i < n; ++i) dist[i][i] = 0;
+
+    // Undirected edges
+    for (const auto& r : roads) {
+        if (r.size() < 3) continue;
+        int u = r[0], v = r[1];
+        if (u < 0 || u >= n || v < 0 || v >= n) continue;
+        long long w = r[2];
+        if (w < dist[u][v]) {
+            dist[u][v] = w;
+            dist[v][u] = w;
+        }
+    }
+
+    // Floyd–Warshall
+    for (int k = 0; k < n; ++k) {
+        for (int i = 0; i < n; ++i) {
+            if (dist[i][k] == INF) continue;
+            for (int j = 0; j < n; ++j) {
+                if (dist[k][j] == INF) continue;
+                long long nd = dist[i][k] + dist[k][j];
+                if (nd < dist[i][j]) {
+                    dist[i][j] = nd;
+                }
+            }
+        }
+    }
+
+    long long sum = 0;
+    for (int i = 0; i < n; ++i) {
+        for (int j = i + 1; j < n; ++j) {
+            if (dist[i][j] != INF) {
+                sum += dist[i][j];
+            }
+        }
+    }
+
+    if (sum == 0) return "0";
+
+    string binary;
+    while (sum > 0) {
+        binary.push_back(char('0' + (sum & 1LL)));
+        sum >>= 1LL;
+    }
+    reverse(binary.begin(), binary.end());
+    return binary;
 }
 
 // =========================================================
