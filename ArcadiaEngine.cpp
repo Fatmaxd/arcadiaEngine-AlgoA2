@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <vector>
+#include <functional>
 #include <string>
 #include <iostream>
 #include <map>
@@ -299,11 +300,71 @@ bool WorldNavigator::pathExists(int n, vector<vector<int>>& edges, int source, i
 
 long long WorldNavigator::minBribeCost(int n, int m, long long goldRate, long long silverRate,
                                        vector<vector<int>>& roadData) {
-    // TODO: Implement Minimum Spanning Tree (Kruskal's or Prim's)
-    // roadData[i] = {u, v, goldCost, silverCost}
-    // Total cost = goldCost * goldRate + silverCost * silverRate
-    // Return -1 if graph cannot be fully connected
-    return -1;
+    // Kruskal's algorithm for MST on an undirected graph
+    if (n <= 0) return 0;
+
+    struct Edge {
+        int u, v;
+        long long w;
+    };
+
+    vector<Edge> edges;
+    edges.reserve(roadData.size());
+    for (const auto& rd : roadData) {
+        if (rd.size() < 4) continue;
+        int u = rd[0], v = rd[1];
+        if (u < 0 || u >= n || v < 0 || v >= n) continue;
+        long long goldCost = rd[2];
+        long long silverCost = rd[3];
+        long long w = goldCost * goldRate + silverCost * silverRate;
+        edges.push_back({u, v, w});
+    }
+
+    if ((int)edges.size() < n - 1) {
+        // Not enough edges to possibly connect all cities
+        // still need to check connectivity in case of multi-edges, but size check is a quick fail
+    }
+
+    sort(edges.begin(), edges.end(), [](const Edge& a, const Edge& b) {
+        return a.w < b.w;
+    });
+
+    // Disjoint Set Union (Union-Find)
+    vector<int> parent(n), rankv(n, 0);
+    iota(parent.begin(), parent.end(), 0);
+
+    function<int(int)> find = [&](int x) -> int {
+        if (parent[x] != x) parent[x] = find(parent[x]);
+        return parent[x];
+    };
+
+    auto unite = [&](int a, int b) -> bool {
+        a = find(a);
+        b = find(b);
+        if (a == b) return false;
+        if (rankv[a] < rankv[b]) swap(a, b);
+        parent[b] = a;
+        if (rankv[a] == rankv[b]) rankv[a]++;
+        return true;
+    };
+
+    long long totalCost = 0;
+    int usedEdges = 0;
+
+    for (const auto& e : edges) {
+        if (unite(e.u, e.v)) {
+            totalCost += e.w;
+            usedEdges++;
+            if (usedEdges == n - 1) break;
+        }
+    }
+
+    if (usedEdges != n - 1) {
+        // Graph is not fully connected
+        return -1;
+    }
+
+    return totalCost;
 }
 
 string WorldNavigator::sumMinDistancesBinary(int n, vector<vector<int>>& roads) {
