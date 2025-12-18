@@ -48,28 +48,76 @@ struct Node {
 // =========================================================
 
 // --- 1. PlayerTable (Double Hashing) ---
-
 class ConcretePlayerTable : public PlayerTable {
 private:
-    // TODO: Define your data structures here
-    // Hint: You'll need a hash table with double hashing collision resolution
+    static const int TABLE_SIZE = 101;
 
+    struct Entry {
+        int playerID;
+        string name;
+        bool occupied;
+
+        Entry() : playerID(-1), name(""), occupied(false) {}
+    };
+
+    vector<Entry> table;
+
+    int h1(int key) const {
+        return key % TABLE_SIZE;
+    }
+
+    int h2(int key) const {
+        return 1 + (key % (TABLE_SIZE - 1));
+    }
 public:
-    ConcretePlayerTable() {
-        // TODO: Initialize your hash table
+    ConcretePlayerTable() : table(TABLE_SIZE) {
     }
 
     void insert(int playerID, string name) override {
-        // TODO: Implement double hashing insert
-        // Remember to handle collisions using h1(key) + i * h2(key)
+        int index = h1(playerID);
+        int step = h2(playerID);
+
+        int baseIndex = index;
+
+        for (int i = 0; i < TABLE_SIZE; i++) {
+
+            if (!table[index].occupied) {
+                table[index].playerID = playerID;
+                table[index].name = name;
+                table[index].occupied = true;
+                return;
+            }
+            if (table[index].occupied && table[index].playerID == playerID) {
+                table[index].name = name;
+                return;
+            }
+
+            index = (baseIndex + i * step) % TABLE_SIZE;
+        }
+
+        cout << "Table is Full" << endl;
     }
 
     string search(int playerID) override {
-        // TODO: Implement double hashing search
-        // Return "" if player not found
+        int index = h1(playerID);
+        int step = h2(playerID);
+
+        int baseIndex = index;
+
+        for (int i = 0; i < TABLE_SIZE; i++) {
+
+            if (!table[index].occupied)
+                return "";
+
+            if (table[index].playerID == playerID)
+                return table[index].name;
+
+            index = (baseIndex + i * step) % TABLE_SIZE;
+        }
         return "";
     }
 };
+
 
 // --- 2. Leaderboard (Skip List) ---
 
