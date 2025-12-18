@@ -262,22 +262,272 @@ public:
 
 class ConcreteAuctionTree : public AuctionTree {
 private:
-    // TODO: Define your Red-Black Tree node structure
-    // Hint: Each node needs: id, price, color, left, right, parent pointers
+    enum Color { RED, BLACK };
+
+    struct RBNode {
+        int itemID;
+        int price;
+        Color color;
+        RBNode* left;
+        RBNode* right;
+        RBNode* parent;
+
+        RBNode(int id, int p) : itemID(id), price(p), color(RED), left(nullptr), right(nullptr), parent(nullptr) {}
+    };
+
+    RBNode* root;
+    int size;
+
+    // Helper to get uncle
+    RBNode* getUncle(RBNode* node) {
+        RBNode* parent = node->parent;
+        if (!parent || !parent->parent) return nullptr;
+        if (parent == parent->parent->left) {
+            return parent->parent->right;
+        } else {
+            return parent->parent->left;
+        }
+    }
+
+    // Rotations
+    void rotateLeft(RBNode* node) {
+        RBNode* parent = node->parent;
+        RBNode* rightChild = node->right;
+        node->right = rightChild->left;
+        if (rightChild->left) rightChild->left->parent = node;
+        rightChild->parent = parent;
+        if (!parent) {
+            root = rightChild;
+        } else if (node == parent->left) {
+            parent->left = rightChild;
+        } else {
+            parent->right = rightChild;
+        }
+        rightChild->left = node;
+        node->parent = rightChild;
+    }
+
+    void rotateRight(RBNode* node) {
+        RBNode* parent = node->parent;
+        RBNode* leftChild = node->left;
+        node->left = leftChild->right;
+        if (leftChild->right) leftChild->right->parent = node;
+        leftChild->parent = parent;
+        if (!parent) {
+            root = leftChild;
+        } else if (node == parent->left) {
+            parent->left = leftChild;
+        } else {
+            parent->right = leftChild;
+        }
+        leftChild->right = node;
+        node->parent = leftChild;
+    }
+
+    // Fix insert violations
+    void fixInsert(RBNode* node) {
+        while (node->parent && node->parent->color == RED) {
+            RBNode* uncle = getUncle(node);
+            RBNode* parent = node->parent;
+            RBNode* grandparent = parent->parent;
+
+            if (uncle && uncle->color == RED) {
+                parent->color = BLACK;
+                uncle->color = BLACK;
+                grandparent->color = RED;
+                node = grandparent;
+            } else {
+                if (parent == grandparent->left) {
+                    if (node == parent->right) {
+                        rotateLeft(parent);
+                        node = parent;
+                        parent = node->parent;
+                    }
+                    parent->color = BLACK;
+                    grandparent->color = RED;
+                    rotateRight(grandparent);
+                } else {
+                    if (node == parent->left) {
+                        rotateRight(parent);
+                        node = parent;
+                        parent = node->parent;
+                    }
+                    parent->color = BLACK;
+                    grandparent->color = RED;
+                    rotateLeft(grandparent);
+                }
+            }
+        }
+        root->color = BLACK;
+    }
+
+    // BST insert without fix
+    RBNode* insertBST(RBNode* node, int id, int price) {
+        if (!node) {
+            return new RBNode(id, price);
+        }
+
+        // Composite key: price asc, then id asc
+        if (price < node->price || (price == node->price && id < node->itemID)) {
+            node->left = insertBST(node->left, id, price);
+            node->left->parent = node;
+        } else if (price > node->price || (price == node->price && id > node->itemID)) {
+            node->right = insertBST(node->right, id, price);
+            node->right->parent = node;
+        } else {
+            // Duplicate key: update price if same id? But ids unique, assume no duplicate id
+            node->price = price;
+            return node;
+        }
+        return node;
+    }
+
+    // Find min in subtree
+    RBNode* findMin(RBNode* node) {
+        while (node && node->left) node = node->left;
+        return node;
+    }
+
+    // Transplant
+    void transplant(RBNode* u, RBNode* v) {
+        if (!u->parent) {
+            root = v;
+        } else if (u == u->parent->left) {
+            u->parent->left = v;
+        } else {
+            u->parent->right = v;
+        }
+        if (v) v->parent = u->parent;
+    }
+
+    // Fix delete violations
+    void fixDelete(RBNode* x) {
+        while (x != root && (x == nullptr || x->color == BLACK)) {
+            if (x == x->parent->left) {
+                RBNode* sibling = x->parent->right;
+                if (sibling->color == RED) {
+                    sibling->color = BLACK;
+                    x->parent->color = RED;
+                    rotateLeft(x->parent);
+                    sibling = x->parent->right;
+                }
+                if ((sibling->left == nullptr || sibling->left->color == BLACK) &&
+                    (sibling->right == nullptr || sibling->right->color == BLACK)) {
+                    sibling->color = RED;
+                    x = x->parent;
+                } else {
+                    if (sibling->right == nullptr || sibling->right->color == BLACK) {
+                        sibling->left->color = BLACK;
+                        sibling->color = RED;
+                        rotateRight(sibling);
+                        sibling = x->parent->right;
+                    }
+                    sibling->color = x->parent->color;
+                    x->parent->color = BLACK;
+                    sibling->right->color = BLACK;
+                    rotateLeft(x->parent);
+                    x = root;
+                }
+            } else {
+                RBNode* sibling = x->parent->left;
+                if (sibling->color == RED) {
+                    sibling->color = BLACK;
+                    x->parent->color = RED;
+                    rotateRight(x->parent);
+                    sibling = x->parent->left;
+                }
+                if ((sibling->right == nullptr || sibling->right->color == BLACK) &&
+                    (sibling->left == nullptr || sibling->left->color == BLACK)) {
+                    sibling->color = RED;
+                    x = x->parent;
+                } else {
+                    if (sibling->left == nullptr || sibling->left->color == BLACK) {
+                        sibling->right->color = BLACK;
+                        sibling->color = RED;
+                        rotateLeft(sibling);
+                        sibling = x->parent->left;
+                    }
+                    sibling->color = x->parent->color;
+                    x->parent->color = BLACK;
+                    sibling->left->color = BLACK;
+                    rotateRight(x->parent);
+                    x = root;
+                }
+            }
+        }
+        if (x) x->color = BLACK;
+    }
+
+    // Delete node by pointer
+    void deleteNode(RBNode* z) {
+        RBNode* y = z;
+        Color yOriginalColor = y->color;
+        RBNode* x;
+
+        if (!z->left) {
+            x = z->right;
+            transplant(z, z->right);
+        } else if (!z->right) {
+            x = z->left;
+            transplant(z, z->left);
+        } else {
+            y = findMin(z->right);
+            yOriginalColor = y->color;
+            x = y->right;
+            if (y->parent == z) {
+                if (x) x->parent = y;
+            } else {
+                transplant(y, y->right);
+                y->right = z->right;
+                y->right->parent = y;
+            }
+            transplant(z, y);
+            y->left = z->left;
+            y->left->parent = y;
+            y->color = z->color;
+        }
+
+        if (yOriginalColor == BLACK) {
+            fixDelete(x);
+        }
+        delete z;
+    }
+
+    // Linear search for node by ID
+    RBNode* findByID(RBNode* node, int id) {
+        if (!node) return nullptr;
+        RBNode* leftRes = findByID(node->left, id);
+        if (leftRes) return leftRes;
+        if (node->itemID == id) return node;
+        return findByID(node->right, id);
+    }
 
 public:
-    ConcreteAuctionTree() {
-        // TODO: Initialize your Red-Black Tree
+    ConcreteAuctionTree() : root(nullptr), size(0) {}
+
+    ~ConcreteAuctionTree() {
+        // Inorder deletion
+        std::function<void(RBNode*)> del = [&](RBNode* node) {
+            if (!node) return;
+            del(node->left);
+            del(node->right);
+            delete node;
+        };
+        del(root);
     }
 
     void insertItem(int itemID, int price) override {
-        // TODO: Implement Red-Black Tree insertion
-        // Remember to maintain RB-Tree properties with rotations and recoloring
+        root = insertBST(root, itemID, price);
+        fixInsert(root);
+        size++;
     }
 
     void deleteItem(int itemID) override {
-        // TODO: Implement Red-Black Tree deletion
-        // This is complex - handle all cases carefully
+        RBNode* node = findByID(root, itemID);
+        if (node) {
+            deleteNode(node);
+            size--;
+        }
     }
 };
 
@@ -286,25 +536,81 @@ public:
 // =========================================================
 
 int InventorySystem::optimizeLootSplit(int n, vector<int>& coins) {
-    // TODO: Implement partition problem using DP
-    // Goal: Minimize |sum(subset1) - sum(subset2)|
-    // Hint: Use subset sum DP to find closest sum to total/2
-    return 0;
+    // Partition problem: min |s1 - s2| = min |2*s1 - total| where s1 closest to total/2
+    int total = 0;
+    for (int c : coins) total += c;
+    int half = total / 2;
+
+    // DP: can we achieve sum j with first i items?
+    vector<bool> dp(half + 1, false);
+    dp[0] = true;
+
+    for (int coin : coins) {
+        for (int j = half; j >= coin; --j) {
+            if (dp[j - coin]) dp[j] = true;
+        }
+    }
+
+    // Find largest achievable <= half
+    int closest = 0;
+    for (int j = half; j >= 0; --j) {
+        if (dp[j]) {
+            closest = j;
+            break;
+        }
+    }
+
+    return total - 2 * closest;
 }
 
 int InventorySystem::maximizeCarryValue(int capacity, vector<pair<int, int>>& items) {
-    // TODO: Implement 0/1 Knapsack using DP
-    // items = {weight, value} pairs
-    // Return maximum value achievable within capacity
-    return 0;
+    // 0/1 Knapsack: max value
+    int m = items.size();
+    vector<vector<int>> dp(m + 1, vector<int>(capacity + 1, 0));
+
+    for (int i = 1; i <= m; ++i) {
+        int w = items[i-1].first;
+        int v = items[i-1].second;
+        for (int c = 0; c <= capacity; ++c) {
+            dp[i][c] = dp[i-1][c];
+            if (c >= w) {
+                dp[i][c] = max(dp[i][c], dp[i-1][c - w] + v);
+            }
+        }
+    }
+
+    return dp[m][capacity];
 }
 
 long long InventorySystem::countStringPossibilities(string s) {
-    // TODO: Implement string decoding DP
-    // Rules: "uu" can be decoded as "w" or "uu"
-    //        "nn" can be decoded as "m" or "nn"
-    // Count total possible decodings
-    return 0;
+    // Decode ways: 'u'/'n' single, "uu"->w, "nn"->m
+    // If 'w' or 'm' present, 0
+    // Empty: 1
+    int len = s.length();
+    if (len == 0) return 1;
+    for (char c : s) {
+        if (c == 'w' || c == 'm') return 0;
+    }
+
+    vector<long long> dp(len + 1, 0);
+    dp[0] = 1;
+    dp[1] = (s[0] == 'u' || s[0] == 'n') ? 1 : 0;
+
+    for (int i = 2; i <= len; ++i) {
+        // Single
+        if (s[i-1] == 'u' || s[i-1] == 'n') {
+            dp[i] += dp[i-1];
+        }
+        // Double
+        if (i >= 2) {
+            string sub = s.substr(i-2, 2);
+            if (sub == "uu" || sub == "nn") {
+                dp[i] += dp[i-2];
+            }
+        }
+    }
+
+    return dp[len];
 }
 
 // =========================================================
@@ -473,13 +779,26 @@ string WorldNavigator::sumMinDistancesBinary(int n, vector<vector<int>>& roads) 
 // =========================================================
 
 int ServerKernel::minIntervals(vector<char>& tasks, int n) {
-    // TODO: Implement task scheduler with cooling time
-    // Same task must wait 'n' intervals before running again
-    // Return minimum total intervals needed (including idle time)
-    // Hint: Use greedy approach with frequency counting
-    return 0;
-}
+    if (tasks.empty()) return 0;
+    if (n == 0) return tasks.size();
 
+    map<char, int> freq;
+    for (char t : tasks) freq[t]++;
+
+    int maxFreq = 0;
+    int countMax = 0;
+    for (auto& p : freq) {
+        if (p.second > maxFreq) {
+            maxFreq = p.second;
+            countMax = 1;
+        } else if (p.second == maxFreq) {
+            countMax++;
+        }
+    }
+
+    int res = (maxFreq - 1) * (n + 1) + countMax;
+    return max(res, (int)tasks.size());
+}
 // =========================================================
 // FACTORY FUNCTIONS (Required for Testing)
 // =========================================================
